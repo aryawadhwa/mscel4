@@ -4,6 +4,11 @@ import numpy as np
 import plotly.graph_objects as go
 import yaml
 import os
+import sys
+
+# Add backend/src to path
+backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
+sys.path.append(os.path.join(backend_path, "src"))
 
 from simulator.scenario_manager import ScenarioManager
 from simulator.modules.thermal import ThermalModule
@@ -16,7 +21,7 @@ st.set_page_config(page_title="Degradation Simulator", layout="wide")
 st.title("Physics-Based Degradation Simulator for Sustainable Packaging")
 
 # Load Material DB
-db_path = os.path.join(os.path.dirname(__file__), "data", "materials.yaml")
+db_path = os.path.join(backend_path, "data", "materials.yaml")
 with open(db_path, "r") as f:
     materials_db = yaml.safe_load(f)
 
