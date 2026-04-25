@@ -1,0 +1,45 @@
+# Base Parameters for Simulation Studies
+pla:
+  name: "Polylactide (PLA)"
+  thermal_a: 1.0e10
+  thermal_ea: 80000.0
+  uv_base: 1.0e-5
+  uv_ea: 20000.0
+  gab_xm: 0.02
+  gab_c: 5.0
+  gab_k: 0.9
+  d_eff: 1.0e-13
+  mw_0: 150000.0
+  baseline_e: 3.5e9
+  baseline_sigma: 60.0e6
+  cost_score: 5
+
+starch:
+  name: "Thermoplastic Starch (TPS)"
+  thermal_a: 5.0e10
+  thermal_ea: 75000.0
+  uv_base: 5.0e-6
+  uv_ea: 15000.0
+  gab_xm: 0.15
+  gab_c: 12.0
+  gab_k: 0.95
+  d_eff: 5.0e-12
+  mw_0: 80000.0
+  baseline_e: 1.2e9
+  baseline_sigma: 20.0e6
+  cost_score: 9
+
+bagasse_pla:
+  name: "Bagasse/PLA Composite"
+  thermal_a: 1.5e10
+  thermal_ea: 85000.0
+  uv_base: 8.0e-6
+  uv_ea: 22000.0
+  gab_xm: 0.05
+  gab_c: 6.0
+  gab_k: 0.85
+  d_eff: 2.0e-13
+  mw_0: 140000.0
+  baseline_e: 5.5e9
+  baseline_sigma: 85.0e6
+  cost_score: 7
