@@ -215,7 +215,10 @@ def run_material_trajectory(mat, sm, temps, rhs, pm, ic, detections_for_adapt=No
     return out
 
 
-if st.button("Run Multi-Material Comparative Study"):
+if st.button("Run Multi-Material Comparative Study", type="primary"):
+    st.session_state["run_analysis"] = True
+
+if st.session_state.get("run_analysis", False):
     sm = ScenarioManager(t_horizon, dt)
     temps, rhs = sm.generate_scenarios(base_temp, 2.0, base_rh, 0.1, 1)
 
