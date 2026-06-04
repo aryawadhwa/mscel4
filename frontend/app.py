@@ -493,60 +493,100 @@ if st.button("Run Multi-Material Comparative Study"):
 
     st.markdown("---")
     st.header("3D Volumetric Moisture Analysis (Geometric Hotspot)")
-    
+
     col_vol_1, col_vol_2 = st.columns([1, 2])
     with col_vol_1:
-        st.write("Simulates moisture diffusing into a thick tray corner (1cm x 1cm) from all exposed faces.")
+        st.write(f"Simulates moisture diffusing into a {tray_length*100:.1f}cm x {tray_width*100:.1f}cm tray corner from all exposed faces.")
         vol_mat_name = st.selectbox("Select Material for Volumetric Analysis", list(materials_db.keys()), key="vol_mat")
-        vol_nodes = st.slider("Grid Resolution (N^3)", 5, 20, 10, step=5)
-        if st.button("Compute 3D Volume (Compute Intensive)"):
+        vol_nodes = st.slider("Grid Resolution (N^3)", 5, 15, 8, step=1,
+                              help="Keep this at 8 or below for fast rendering.")
+        vol_snapshots = st.slider("Number of Time Snapshots", 5, 20, 10, step=5,
+                                  help="Fewer = faster. These are evenly spaced across the time horizon.")
+        if st.button("Compute 3D Volume"):
             st.session_state["compute_vol"] = True
             st.session_state["vol_mat_name"] = vol_mat_name
             st.session_state["vol_nodes"] = vol_nodes
-            
+            st.session_state["vol_snapshots"] = vol_snapshots
+            st.session_state["vol_result"] = None  # Clear stale result
+
     with col_vol_2:
         if st.session_state.get("compute_vol", False):
             v_mat = materials_db[st.session_state["vol_mat_name"]]
             v_nodes = st.session_state["vol_nodes"]
-            
-            # Use smaller dimensions to represent a corner block (e.g. 1cm x 1cm x 2mm)
-            mm3d = MoistureModule3D(
-                float(v_mat["gab_xm"]), float(v_mat["gab_c"]), float(v_mat["gab_k"]), float(v_mat["d_eff"]), 
-                length=0.01, width=0.01, thickness=tray_thick, nodes=v_nodes
-            )
-            
-            with st.spinner("Computing 3D FTCS Diffusion in MLX..."):
-                dt_seconds = dt * 86400
-                # Using the single scenario environmental humidity
-                uptake_3d, grid_history = mm3d.solve_3d_ham_pde(dt_seconds, rhs[0])
-                
-                # Get the grid at the selected time_step
-                step_idx = min(int(time_step / dt), len(sm.t_array) - 1)
-                Z_grid = grid_history[step_idx]
-                
-                # Plotly 3D Volume
-                X, Y, Z_coords = np.mgrid[0:0.01:complex(0, v_nodes), 0:0.01:complex(0, v_nodes), 0:tray_thick:complex(0, v_nodes)]
-                
+            v_snaps = st.session_state.get("vol_snapshots", 10)
+
+            # Only recompute if result not cached
+            if st.session_state.get("vol_result") is None:
+                mm3d = MoistureModule3D(
+                    float(v_mat["gab_xm"]), float(v_mat["gab_c"]),
+                    float(v_mat["gab_k"]), float(v_mat["d_eff"]),
+                    length=float(tray_length), width=float(tray_width),
+                    thickness=float(tray_thick), nodes=v_nodes
+                )
+
+                with st.spinner(f"Computing {v_snaps} snapshots of 3D FTCS Diffusion..."):
+                    dt_seconds = dt * 86400
+                    rh_input = rhs[0] if hasattr(rhs, "__getitem__") else rhs
+                    snapshot_days, grid_history = mm3d.solve_3d_ham_pde(
+                        dt_seconds, rh_input, num_snapshots=v_snaps
+                    )
+                    st.session_state["vol_result"] = {
+                        "snapshot_days": snapshot_days,
+                        "grid_history": grid_history,
+                        "nodes": v_nodes,
+                    }
+
+            vol_res = st.session_state.get("vol_result")
+            if vol_res:
+                snapshot_days = vol_res["snapshot_days"]
+                grid_history = vol_res["grid_history"]
+                v_nodes = vol_res["nodes"]
+
+                # Let user pick which snapshot to view
+                frame_idx = st.slider(
+                    "View Snapshot (Day)", 0, len(snapshot_days) - 1, 0,
+                    format=f"Frame %d of {len(snapshot_days)-1}"
+                )
+                day_label = snapshot_days[frame_idx]
+                Z_grid = grid_history[frame_idx]
+
+                X_c, Y_c, Z_c = np.mgrid[
+                    0:float(tray_length):complex(0, v_nodes),
+                    0:float(tray_width):complex(0, v_nodes),
+                    0:float(tray_thick):complex(0, v_nodes)
+                ]
+
+                v_min = float(Z_grid.min())
+                v_max = float(Z_grid.max())
+                if v_max <= v_min:
+                    v_max = v_min + 1e-6
+
                 fig_vol = go.Figure(data=go.Volume(
-                    x=X.flatten(),
-                    y=Y.flatten(),
-                    z=Z_coords.flatten(),
+                    x=X_c.flatten(),
+                    y=Y_c.flatten(),
+                    z=Z_c.flatten(),
                     value=Z_grid.flatten(),
-                    isomin=np.min(Z_grid),
-                    isomax=np.max(Z_grid),
-                    opacity=0.1,
-                    surface_count=15,
-                    colorscale='YlGnBu'
+                    isomin=v_min,
+                    isomax=v_max,
+                    opacity=0.12,
+                    surface_count=12,
+                    colorscale="YlGnBu",
+                    colorbar=dict(title="Moisture (kg/kg)")
                 ))
                 fig_vol.update_layout(
-                    title=f"Moisture Concentration at Day {time_step}",
+                    title=f"Moisture Concentration — Day {day_label} of {int(t_horizon)}",
                     scene=dict(
-                        xaxis_title='X (m)',
-                        yaxis_title='Y (m)',
-                        zaxis_title='Z (Thickness)'
+                        xaxis_title="X (m)",
+                        yaxis_title="Y (m)",
+                        zaxis_title="Z / Thickness (m)",
                     ),
                     margin=dict(l=0, r=0, b=0, t=40),
-                    height=500
+                    height=520,
                 )
                 st.plotly_chart(fig_vol, use_container_width=True)
+                st.caption(
+                    f"Snapshot {frame_idx + 1}/{len(snapshot_days)} | "
+                    f"Material: {v_mat['name']} | Grid: {v_nodes}x{v_nodes}x{v_nodes}"
+                )
+
 
