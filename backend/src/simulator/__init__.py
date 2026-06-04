@@ -14,6 +14,7 @@ from .modules.thermal import ThermalModule
 from .modules.uv import UVModule
 from .modules.moisture import MoistureModule
 from .modules.moisture_3d import MoistureModule3D
+from .modules.structural import ComponentSimulator
 
 # Simulation orchestration
 from .scenario_manager import ScenarioManager
@@ -30,6 +31,7 @@ __all__ = [
     "UVModule",
     "MoistureModule",
     "MoistureModule3D",
+    "ComponentSimulator",
     "ScenarioManager",
     "PropertyMapper",
     "IntegrityChecker",
