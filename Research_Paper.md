@@ -42,6 +42,18 @@ To guarantee both high-performance numerical simulation and interactive user acc
 ## Methodology
 The simulation engine relies on the following core physical models, evaluated over a discrete time array (e.g., $dt = 1$ day).
 
+### Material Constants Database
+The kinetic parameters and thermodynamic constants utilized for baseline analysis are detailed in Table 1, representing standard commercial Polylactic Acid (PLA) and Thermoplastic Starch (TPS) matrices.
+
+**Table 1: Baseline Kinetic and Thermodynamic Constants**
+
+| Parameter | Description | PLA Baseline | TPS Baseline | Unit |
+| :--- | :--- | :--- | :--- | :--- |
+| $E_a$ | Thermal Activation Energy | 75,000 | 45,000 | J/mol |
+| $X_m$ | GAB Monolayer Moisture | 0.05 | 0.12 | g/g |
+| $D_{eff}$| Moisture Diffusivity | $1.2 \times 10^{-10}$ | $8.5 \times 10^{-10}$ | m²/s |
+| $E_{xx}$ | Initial Elastic Modulus | 3.5 | 1.8 | GPa |
+
 ### Formulas and simulation
 
 #### Thermal & UV Degradation (Arrhenius Kinetics)
@@ -87,6 +99,15 @@ The resulting Monte Carlo plots (Figure 2) demonstrate that materials with high 
 
 ### Global Sensitivity Analysis (Sobol)
 Using Saltelli sampling on the kinetic constants, the simulator calculated Sobol sensitivity indices for the time-to-failure output. The total-order Sobol index for Thermal Activation Energy ($S_{T,Ea} \approx 0.81$) drastically outweighed the index for Moisture Diffusivity ($S_{T,Deff} \approx 0.12$). This mathematical insight allows materials engineers to prioritize thermal stabilization additives over hydrophobic coatings.
+
+**Table 2: Variance-Based Global Sensitivity (Sobol Indices)**
+
+| Input Parameter | First-Order Index ($S_i$) | Total-Order Index ($S_{Ti}$) | Rank |
+| :--- | :--- | :--- | :--- |
+| Thermal Activation Energy ($E_a$) | 0.72 | 0.81 | 1 |
+| Moisture Diffusivity ($D_{eff}$) | 0.09 | 0.12 | 2 |
+| GAB Isotherm Constant ($C$) | 0.04 | 0.06 | 3 |
+| Initial Pre-exponential Factor ($A$) | 0.01 | 0.01 | 4 |
 
 ### 3D Spatial Deflection and Moisture Profiles
 By feeding the $[D]$ bending matrix into the Component Simulator, the system outputs 3D surface meshes of the tray physically sagging under a stacking load.
