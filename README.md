@@ -1,68 +1,148 @@
 # Physics-Based Degradation Simulator for Sustainable Packaging
 
-## Abstract
-This project presents a highly optimized, physics-based simulator designed to evaluate the environmental degradation and mechanical lifecycle of biodegradable packaging materials (e.g., PLA, Thermoplastic Starch, Bagasse composites). Abandoning black-box ML/DL models in favor of interpretable engineering and chemistry fundamentals, the simulator couples kinetic degradation models with structural analysis to predict residual strength across stochastic environmental scenarios. The tool empowers researchers to conduct rapid, deterministic lifecycle assessments under real-world supply chain stressors.
+## 1. Abstract
+This project presents a highly optimized, physics-based simulator designed to evaluate the environmental degradation and mechanical lifecycle of biodegradable packaging materials (e.g., Polylactic Acid (PLA), Thermoplastic Starch (TPS), Bagasse composites). Abandoning black-box Machine Learning (ML) models in favor of interpretable engineering and chemistry fundamentals, the simulator couples kinetic degradation models with macroscopic structural analysis to predict residual strength across stochastic environmental scenarios. The tool empowers researchers to conduct rapid, deterministic lifecycle assessments under real-world supply chain stressors without relying on opaque predictive algorithms.
 
-## Introduction
-Sustainable packaging materials often face unpredictable degradation pathways in dynamic supply chains. Current evaluation methods either rely on expensive, time-consuming physical testing or opaque machine learning models that lack physical interpretability. This project introduces a computational companion that bridges the "lifetime evaluation gap" by utilizing established physical chemistry and mechanics. We provide an interactive, batch-accelerated Monte Carlo dashboard for comparative material studies, enabling the design of resilient, sustainable packaging.
+## 2. Introduction
+Sustainable packaging materials often face unpredictable degradation pathways in dynamic supply chains. Traditional evaluation methods either rely on expensive, time-consuming physical weathering tests or opaque machine learning models that lack physical interpretability and require massive datasets. 
 
-## Related Work
+This project introduces a computational companion that bridges the "lifetime evaluation gap" by utilizing established physical chemistry (Arrhenius kinetics, Guggenheim-Anderson-de Boer isotherms) and mechanics (Classical Lamination Theory). We provide an interactive, batch-accelerated Monte Carlo dashboard for comparative material studies, enabling the design of resilient, sustainable packaging tailored to specific climatic journeys.
+
+## 3. Related Work
 - **Kinetic Degradation Models**: Foundational work on Arrhenius kinetics for hydrolytic and thermal decay.
 - **Moisture Sorption**: Guggenheim-Anderson-de Boer (GAB) isotherm modeling for equilibrium moisture content in biopolymers.
 - **Composite Mechanics**: Classical Lamination Theory (CLT) (Jones, R.M., 1999) applied to time-dependent degradation of laminates.
 - **Sensitivity Analysis**: Variance-based global sensitivity analysis using Saltelli sampling and Sobol indices (Saltelli, A. et al., 2010).
 
-## Proposed System
-### System Concept
-The simulator models the degradation of packaging trays over a specified time horizon (e.g., 365 days). It samples environmental profiles (Temperature, Relative Humidity) via Monte Carlo methods to simulate diverse climate scenarios (Temperate, Tropical, Cold, Hot Dry, Refrigerated). The kinetic modules compute molecular weight decay and moisture uptake, which are then mapped to macroscopic structural knockdown factors to predict mechanical failure.
+## 4. Proposed System
+### 4.1. System Concept & Flow Diagram
+The simulator models the degradation of packaging trays over a user-specified time horizon. It samples environmental profiles (Temperature, Relative Humidity) via Monte Carlo methods to simulate diverse climate scenarios (e.g., Tropical, Cold Chain). The kinetic modules compute molecular weight decay and moisture uptake over time, which are then mapped to macroscopic structural knockdown factors to predict mechanical failure against user-defined stiffness and strength thresholds.
 
-### Tech Stack
-- **Backend (Physics Engine)**: Pure Python with `NumPy` for vectorized, hardware-agnostic tensor operations and PDE solving. `SALib` for global sensitivity analysis.
-- **Frontend (Interactive UI)**: `Streamlit` for the web dashboard, providing real-time 1D/3D visualization and parameter tuning.
-- **Visualization**: `Plotly` for interactive 3D surface plots and confidence bands.
-- **Data Management**: `PyYAML` for the parametric material database.
+```mermaid
+graph TD
+    A[materials.yaml] --> B(Scenario Manager)
+    B --> |Monte Carlo Temps/RH| C{Physics Engine}
+    
+    subgraph Kinetic Degradation
+        C --> D[ThermalModule]
+        C --> E[UVModule]
+        C --> F[MoistureModule 1D/3D]
+    end
+    
+    D --> |Mw decay| G[Property Mapper]
+    E --> |Mw decay| G
+    F --> |Moisture Content| G
+    
+    G --> |Classical Lamination Theory| H(Integrity Checker)
+    H --> |Residual Strength & Stiffness| I(Recommender System)
+    
+    I --> |Viability Scores| J((Streamlit Dashboard))
+    F -.-> |3D Spatial Diffusion| J
+```
 
-## Methodology
-The simulation engine relies on the following core physical models:
+### 4.2. Tech Stack
+- **Backend (Physics Engine)**: Pure Python architecture optimized with `NumPy`. `NumPy` was chosen for highly vectorized, hardware-agnostic tensor operations and solving Partial Differential Equations (PDEs) rapidly.
+- **Sensitivity Analysis**: `SALib` is used for global variance-based sensitivity (Sobol).
+- **Frontend (Interactive UI)**: `Streamlit` provides the web dashboard for real-time 1D/3D visualization and hyperparameter tuning.
+- **Visualization**: `Plotly` is used for interactive 3D surface plots (deflection, moisture concentration) and 90% confidence bands.
+- **Data Management**: `PyYAML` is used for the parametric material database, enabling easy insertion of new composite materials without altering code.
+- **Computer Vision (Optional)**: `ultralytics` (YOLO) and `onnxruntime` provide an adaptive pipeline to detect pre-existing defects.
 
-1. **Thermal & UV Degradation (Arrhenius Kinetics)**:
-   Chain scission and molecular weight ($M_w$) loss are modeled using the Arrhenius equation:
-   $$k(T) = A \cdot \exp\left(-\frac{E_a}{R \cdot T}\right)$$
-   UV-induced degradation is coupled with temperature and irradiance:
-   $$k_{uv}(T, I) = k_{uv,base} \cdot I \cdot \exp\left(-\frac{E_{a,uv}}{R \cdot T}\right)$$
+## 5. File Structure and Code Breakdown
+The repository is modularly structured to strictly separate physical logic from frontend visualization.
 
-2. **Moisture Uptake (GAB Isotherm & Fickian Diffusion)**:
-   Equilibrium moisture ($M_{eq}$) is determined by the GAB isotherm:
-   $$M_{eq} = \frac{X_m \cdot C \cdot K \cdot a_w}{(1 - K \cdot a_w)(1 - K \cdot a_w + C \cdot K \cdot a_w)}$$
-   Transient 1D/3D uptake is solved via Fick's Second Law using an explicit FTCS (Forward-Time Central-Space) finite difference scheme.
+```text
+mscel4/
+├── backend/
+│   ├── data/
+│   │   ├── materials.yaml         # Database of kinetic parameters (Ea, GAB constants, Mw)
+│   │   └── adapter_config.yaml    # YOLO Vision Adapter configurations
+│   ├── scripts/
+│   │   ├── generate_paper_figures.py # Batch script to render Plotly graphs for publication
+│   │   ├── sensitivity_analysis.py   # Script to test perturbations (+/- 10% on params)
+│   │   └── sobol_analysis.py         # Generates Saltelli samples and runs Sobol indices
+│   └── src/
+│       └── simulator/
+│           ├── __init__.py           # Exports public API
+│           ├── constants.py          # Shared physical constants (R_GAS, UV baseline) and pure functions
+│           ├── integrity_checker.py  # Evaluates physical properties against failure thresholds
+│           ├── property_mapper.py    # Maps Mw loss/Moisture to stiffness using Classical Lamination Theory
+│           ├── recommender.py        # Rule-based scoring (0-100) combining lifetime margin and cost
+│           ├── scenario_manager.py   # Monte Carlo climate generator (Temp/RH distributions)
+│           ├── vision_adapter.py     # Bridges YOLO defect output to initial moisture/stiffness offsets
+│           ├── yolo_inference.py     # Wrapper for ONNX YOLO model inference
+│           ├── external_clt/         # Reference implementations of CLT
+│           └── modules/
+│               ├── moisture.py       # 1D Fickian diffusion and GAB isotherm solver
+│               ├── moisture_3d.py    # 3D spatial diffusion PDE solver (FTCS scheme)
+│               ├── thermal.py        # Arrhenius thermal decay kinetics
+│               ├── uv.py             # UV-induced chain scission kinetics
+│               └── structural.py     # Computes geometric tray deflection using assembled ABD matrices
+├── frontend/
+│   └── app.py                        # Streamlit dashboard orchestrating the backend modules into an interactive UI
+└── pyproject.toml                    # Python package and dependency declarations
+```
 
-3. **Structural Knockdown (Classical Lamination Theory)**:
-   A phenomenological mapping combines $M_w$ loss and moisture plasticization into a knockdown factor:
-   $$kd(t) = \exp\left(-\left[\left(1 - \frac{M_w(t)}{M_{w0}}\right) + 0.5 \cdot M(t)\right]\right)$$
-   This factor reduces the lamina stiffness matrix $[Q]$, which is then assembled into the macroscopic $[A]$, $[B]$, and $[D]$ matrices via CLT.
+### Detailed Module Functionality
+- **`constants.py`**: Ensures thermodynamic consistency across scripts by centralizing the universal gas constant ($R = 8.314$ J/mol·K) and standard UV irradiance parameters.
+- **`scenario_manager.py`**: Generates thousands of stochastic climate scenarios (Temperate, Tropical, etc.) to ensure the materials are stress-tested against realistic variance rather than ideal laboratory constants.
+- **`property_mapper.py`**: The crux of the multi-scale physics. It translates molecular-level degradation into macroscopic failure by computing the reduced stiffness matrix $[Q]$ and assembling the $[A], [B], [D]$ stiffness matrices.
+- **`moisture_3d.py`**: A memory-optimized 3D solver. It uses an explicit Forward-Time Central-Space (FTCS) finite difference scheme to track how moisture penetrates a physical 3D geometry over time.
 
-4. **Sensitivity & Monte Carlo Analysis**:
-   Environmental profiles use normal distributions around base climate parameters. Sobol analysis identifies the primary parameter drivers (e.g., Activation Energy) for failure time variance.
+## 6. Methodology (Formulas and Simulation)
 
-## Results and Discussion
-The simulator outputs provide multi-dimensional insights into material behavior:
-- **1D Degradation Trajectories**: Displays the median residual strength over time with 90% confidence intervals under varying climates.
-- **3D Moisture Diffusion**: Visualizes spatial moisture gradients across the packaging geometry over time.
-- **Sobol Sensitivity Indices**: Identifies that Thermal Activation Energy ($E_a$) dominates the variance in predicted failure times, validating the Arrhenius-driven kinetic model.
-- **Visual Diversity for Demonstration**: By adjusting the *Environment* (e.g., Tropical vs. Refrigerated), the *Material* (e.g., Bagasse/PLA vs. TPS), and the *Failure Criteria* ($E$ and $\sigma$ thresholds), users can observe distinct failure profiles, from rapid structural collapse to prolonged stability.
+The simulation engine relies on the following core physical models, evaluated over a discrete time array (e.g., $dt = 1$ day).
 
-## Future Scope
-- **Vision Integration**: Integration of a Vision Adapter using YOLO to detect pre-existing surface defects and adjust the initial damage offset ($M_0$) in the Fickian solver.
-- **Empirical Validation**: Expansion of the `materials.yaml` database with empirically validated constants from laboratory weathering tests.
-- **Complex Geometries**: Support for complex, non-rectangular packaging geometries in the 3D PDE solver.
+### 6.1. Thermal & UV Degradation (Arrhenius Kinetics)
+Chain scission and molecular weight ($M_w$) loss are modeled using the Arrhenius equation. The base rate constant $k(T)$ is:
+$$k(T) = A \cdot \exp\left(-\frac{E_a}{R \cdot T}\right)$$
+Where:
+- $A$: Pre-exponential frequency factor
+- $E_a$: Activation energy (J/mol)
+- $R$: Universal gas constant (8.314 J/(mol·K))
+- $T$: Absolute temperature (K)
 
-## Conclusion
-The Degradation Simulator offers a robust, physics-driven alternative to purely empirical lifecycle assessments. By seamlessly linking molecular-level kinetics with macroscopic structural mechanics, it enables researchers to predict the viability of sustainable packaging across global supply chains.
+UV-induced degradation is coupled with temperature and irradiance ($I$):
+$$k_{uv}(T, I) = k_{uv,base} \cdot I \cdot \exp\left(-\frac{E_{a,uv}}{R \cdot T}\right)$$
 
-## Acknowledgement
-We would like to acknowledge the foundational work in composite mechanics and biopolymer kinetics that made this simulation possible. We extend our gratitude to our advisors and institution for their guidance and support throughout this research.
+Total molecular weight decay follows first-order kinetics:
+$$M_w(t) = M_{w0} \cdot \exp\left(-(k_t + k_{uv}) \cdot t\right)$$
 
-## References
+### 6.2. Moisture Uptake (GAB Isotherm & Fickian Diffusion)
+Equilibrium moisture ($M_{eq}$) under specific relative humidity ($a_w$) is determined by the GAB isotherm:
+$$M_{eq} = \frac{X_m \cdot C \cdot K \cdot a_w}{(1 - K \cdot a_w)(1 - K \cdot a_w + C \cdot K \cdot a_w)}$$
+Where $X_m$ is the monolayer moisture content, and $C, K$ are thermodynamic constants.
+
+Transient 3D moisture diffusion is solved via Fick's Second Law:
+$$\frac{\partial C}{\partial t} = D_{eff} \left( \frac{\partial^2 C}{\partial x^2} + \frac{\partial^2 C}{\partial y^2} + \frac{\partial^2 C}{\partial z^2} \right)$$
+This PDE is solved using an explicit FTCS finite difference scheme with Dirichlet boundary conditions set by $M_{eq}$.
+
+### 6.3. Structural Knockdown (Classical Lamination Theory)
+A phenomenological mapping combines $M_w$ loss and moisture plasticization into a mechanical knockdown factor ($kd$):
+$$kd(t) = \exp\left(-\left[\left(1 - \frac{M_w(t)}{M_{w0}}\right) + 0.5 \cdot M(t)\right]\right)$$
+This knockdown factor strictly reduces the lamina stiffness matrix $[Q]$. The reduced $[Q]$ matrices are then integrated across the component's thickness to assemble the macroscopic extensional $[A]$, coupling $[B]$, and bending $[D]$ stiffness matrices via Classical Lamination Theory (CLT).
+
+### 6.4. Monte Carlo & Global Sensitivity Analysis
+Because exact supply chain temperatures fluctuate, the simulator injects Gaussian noise into environmental profiles. Using Saltelli sampling and Sobol variance-based decomposition, the system identifies which material parameters (e.g., Activation Energy vs. Diffusivity) are responsible for the largest variance in the final failure time.
+
+## 7. Results and Discussion
+The interactive dashboard and backend batch scripts provide rich output dimensions:
+- **1D Degradation Trajectories**: Generates line plots of median residual strength over time, bounded by 90% confidence intervals. This proves that high-variance climates (like Tropical profiles) lead to wider uncertainty in the packaging's shelf life.
+- **3D Spatial Deflection & Moisture**: By feeding the $[D]$ bending matrix into the `ComponentSimulator`, the system outputs 3D surface meshes of the tray physically sagging under a stacking load. The 3D volumetric plot illustrates moisture gradients pooling at the corners of the geometry.
+- **Global Sensitivity**: Sobol indices output by `sobol_analysis.py` mathematically prove that Thermal Activation Energy ($E_a$) completely dominates the variance in predicted failure times, validating the Arrhenius-driven assumption over purely moisture-driven decay for these specific composite classes.
+
+## 8. Future Scope
+- **Vision Integration**: Full frontend integration of the YOLO Vision Adapter. This will allow the simulator to analyze photos of physically damaged trays, detect surface defects, and programmatically adjust the initial damage offset ($M_0$) before running the Fickian PDE solver.
+- **Empirical Validation**: Expansion of the `materials.yaml` database with empirically validated constants from rigorous laboratory weathering and tensile testing.
+- **Complex Geometries**: Expanding the `MoistureModule3D` PDE solver to support complex, non-rectangular packaging geometries (e.g., thermoformed cups with varying wall thicknesses) via Finite Element meshes rather than finite differences.
+
+## 9. Conclusion
+The Degradation Simulator offers a robust, deterministic, and physics-driven alternative to purely empirical lifecycle assessments or opaque ML models. By seamlessly linking molecular-level kinetic chemistry with macroscopic structural mechanics, the simulator enables researchers and engineers to predict the viability of sustainable packaging across chaotic, global supply chains. The modular architecture ensures that as better mathematical models for biopolymers are discovered, they can be inserted directly into the pipeline.
+
+## 10. Acknowledgement
+We would like to acknowledge the foundational work in composite mechanics and biopolymer kinetics that made this simulation possible. We extend our deepest gratitude to our advisors and institution for their guidance, resources, and unwavering support throughout this research.
+
+## 11. References
 **Kinetic Degradation & Thermodynamics**
 1. Laycock, B., et al. (2017). "Lifetime prediction of biodegradable polymers." *Progress in Polymer Science*, 71, 144-189. [Link](https://doi.org/10.1016/j.progpolymsci.2017.02.004)
 2. Tsuji, H. (2002). "Autocatalytic hydrolysis of amorphous-made polylactides: effects of L-lactide content, tacticity, and enantiomeric polymer blending." *Polymer*, 43(6), 1789-1796. [Link](https://doi.org/10.1016/S0032-3861(02)00004-9)
