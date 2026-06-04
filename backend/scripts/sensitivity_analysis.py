@@ -12,6 +12,7 @@ from simulator.modules.uv import UVModule
 from simulator.modules.moisture import MoistureModule
 from simulator.property_mapper import PropertyMapper
 from simulator.integrity_checker import IntegrityChecker
+from simulator.constants import UV_BASELINE_W_M2
 
 def run_sensitivity():
     print("Starting Sensitivity Analysis...")
@@ -46,14 +47,14 @@ def run_sensitivity():
         tm = ThermalModule(float(mat["thermal_a"]), float(mat["thermal_ea"]) * pert["ea_mod"], float(mat["mw_0"]))
         uv = UVModule(float(mat["uv_base"]), float(mat["uv_ea"]))
         # Thickness baseline = 0.002
-        mm = MoistureModule(float(mat["gab_xm"]), float(mat["gab_c"]), float(mat["gab_k"]), float(mat["d_eff"]), thickness=0.002 * pert["h_mod"], nodes=10)
+        mm = MoistureModule(float(mat["gab_xm"]), float(mat["gab_c"]), float(mat["gab_k"]), float(mat["d_eff"]), thickness=0.002 * pert["h_mod"])
         
         # Parallel solve for 100 scenarios
         k_t = tm.compute_k(temps)
-        k_uv = uv.compute_k_uv(temps, np.ones_like(temps) * 40.0) # 40 W/m2 UV baseline
+        k_uv = uv.compute_k_uv(temps, np.ones_like(temps) * UV_BASELINE_W_M2)
         
         mw_t = tm.compute_mw_decay(k_t + k_uv, sm.t_array)
-        moisture = mm.solve_1d_ham_pde(dt * 86400, rhs)
+        moisture = mm.solve_1d_ham_pde(dt * 86400.0, rhs[0])
         
         knockdown = pm.compute_knockdown(mw_t, mat["mw_0"], moisture)
         usable_mask = ic.evaluate_usability(knockdown, 1.0, knockdown, 1.0)

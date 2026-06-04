@@ -20,10 +20,6 @@ dependencies = [
     "opencv-python",
     "ultralytics",
     "pillow",
-    "onnxruntime",
-    "opencv-python",
-    "ultralytics",
-    "pillow"
 ]
 
 [project.optional-dependencies]

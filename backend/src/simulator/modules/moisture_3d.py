@@ -1,16 +1,20 @@
 import numpy as np
-
-try:
-    import mlx.core as mx
-    _HAS_MLX = True
-except ImportError:
-    _HAS_MLX = False
+from simulator.constants import gab_equilibrium_moisture, COURANT_SAFETY
+import warnings
 
 
 class MoistureModule3D:
     """
-    Computes 3D moisture uptake using GAB isotherm and 3D Finite Element (FTCS) diffusion.
-    Stores only a fixed number of snapshots (num_snapshots) to avoid memory blowout.
+    3D moisture diffusion via explicit FTCS Fickian scheme.
+
+    Solves the 3D diffusion PDE:
+        ∂C/∂t = D_eff * (∂²C/∂x² + ∂²C/∂y² + ∂²C/∂z²)
+
+    with Dirichlet boundary conditions on all 6 faces derived from the
+    GAB sorption isotherm.
+
+    Only a fixed number of snapshots are stored (not one per time step) to
+    prevent memory exhaustion in the Streamlit frontend.
     """
 
     def __init__(
@@ -24,11 +28,27 @@ class MoistureModule3D:
         thickness: float,
         nodes: int = 10,
     ):
+        """
+        Parameters
+        ----------
+        gab_xm    : float  GAB monolayer moisture content [kg/kg]
+        gab_c     : float  GAB constant C (dimensionless)
+        gab_k     : float  GAB constant K (dimensionless)
+        d_eff     : float  Effective diffusion coefficient [m²/s]
+        length    : float  Domain length in x [m]
+        width     : float  Domain width in y [m]
+        thickness : float  Domain thickness in z [m]
+        nodes     : int    Grid points per dimension (N³ total nodes)
+        """
+        if d_eff <= 0:
+            raise ValueError(f"d_eff must be > 0, got {d_eff}")
+        if nodes < 3:
+            raise ValueError(f"nodes must be >= 3, got {nodes}")
+
         self.xm = gab_xm
         self.c = gab_c
         self.k = gab_k
         self.d_eff = d_eff
-
         self.L = length
         self.W = width
         self.H = thickness
@@ -38,13 +58,22 @@ class MoistureModule3D:
         self.dy = width / (nodes - 1)
         self.dz = thickness / (nodes - 1)
 
+        # Warn if grid is coarse relative to diffusivity — informational only
+        max_dt_stable = 0.5 / (
+            d_eff * (1 / self.dx ** 2 + 1 / self.dy ** 2 + 1 / self.dz ** 2)
+        )
+        if max_dt_stable < 1.0:  # less than 1 second of stability per step
+            warnings.warn(
+                f"Grid is numerically coarse for D_eff={d_eff:.2e} m²/s. "
+                f"Max stable dt={max_dt_stable:.3f} s. "
+                "Many sub-steps will be needed per day — consider increasing nodes.",
+                UserWarning,
+                stacklevel=2,
+            )
+
     def equilibrium_moisture_gab(self, aw: float) -> float:
-        """GAB Model for equilibrium moisture content. aw = water activity (RH)."""
-        num = self.xm * self.c * self.k * aw
-        den = (1 - self.k * aw) * (1 - self.k * aw + self.c * self.k * aw)
-        if den == 0:
-            return 0.0
-        return num / den
+        """GAB isotherm — delegates to shared pure function in constants.py."""
+        return gab_equilibrium_moisture(self.xm, self.c, self.k, aw)
 
     def solve_3d_ham_pde(
         self,
@@ -53,43 +82,41 @@ class MoistureModule3D:
         num_snapshots: int = 10,
     ) -> tuple:
         """
-        Solves the 3D moisture diffusion PDE using an explicit FTCS scheme.
+        Solve the 3D moisture diffusion PDE using an explicit FTCS scheme.
 
-        Only stores `num_snapshots` evenly-spaced grid snapshots instead of
-        one per time step, preventing memory exhaustion and UI freeze.
+        Only `num_snapshots` evenly-spaced grid frames are stored to avoid
+        memory exhaustion.
 
-        Args:
-            dt:            Time step size in seconds.
-            rh_env:        Array of external RH values, shape (time_steps,).
-            num_snapshots: How many grid frames to capture (default 10).
+        Parameters
+        ----------
+        dt            : float        Outer time step [s]
+        rh_env        : array-like   External RH values, shape (time_steps,) [0-1]
+        num_snapshots : int          Number of grid frames to capture (default 10)
 
-        Returns:
-            (snapshot_days, grid_history)
-            snapshot_days:  list of day indices for each saved frame.
-            grid_history:   list of np.ndarray of shape (N, N, N).
+        Returns
+        -------
+        (snapshot_days, grid_history)
+        snapshot_days : list[int]           Day indices of saved frames
+        grid_history  : list[np.ndarray]    Grid snapshots, each shape (N, N, N)
         """
-        # Convert rh_env to plain Python list so we don't depend on MLX here
-        if hasattr(rh_env, "tolist"):
-            rh_list = rh_env.tolist()
-        else:
-            rh_list = list(rh_env)
-
+        rh_list = list(rh_env) if hasattr(rh_env, "__iter__") else [float(rh_env)]
         time_steps = len(rh_list)
 
-        # Courant stability limit for explicit 3D FTCS
+        # Courant-Friedrichs-Lewy (CFL) stability limit for explicit 3D FTCS
         max_dt = 1.0 / (
-            2
-            * self.d_eff
-            * (1 / self.dx ** 2 + 1 / self.dy ** 2 + 1 / self.dz ** 2)
+            2.0 * self.d_eff * (
+                1 / self.dx ** 2 + 1 / self.dy ** 2 + 1 / self.dz ** 2
+            )
         )
-        sub_steps = max(1, int(np.ceil(dt / max_dt)))
+        sub_steps = max(1, int(np.ceil(dt / (max_dt * COURANT_SAFETY))))
         sub_dt = dt / sub_steps
 
         alpha_x = self.d_eff * sub_dt / self.dx ** 2
         alpha_y = self.d_eff * sub_dt / self.dy ** 2
         alpha_z = self.d_eff * sub_dt / self.dz ** 2
 
-        # Decide which outer time steps to snapshot
+        # Snapshot indices — evenly spaced across time steps
+        num_snapshots = max(2, min(num_snapshots, time_steps))
         snap_indices = set(
             int(round(i * (time_steps - 1) / (num_snapshots - 1)))
             for i in range(num_snapshots)
@@ -98,18 +125,16 @@ class MoistureModule3D:
         snap_indices.add(time_steps - 1)
         snap_indices = sorted(snap_indices)
 
-        # Use plain NumPy for the grid — avoids MLX graph growth
         W = np.zeros((self.N, self.N, self.N), dtype=np.float32)
-
         grid_history = []
         snapshot_days = []
 
         for t in range(time_steps):
-            aw = float(rh_list[t]) if hasattr(rh_list[t], "__float__") else rh_list[t]
+            aw = float(rh_list[t])
             w_eq = float(self.equilibrium_moisture_gab(aw))
 
             for _ in range(sub_steps):
-                # Dirichlet BC on all 6 faces
+                # Dirichlet BC on all 6 exposed faces
                 W[0, :, :] = w_eq
                 W[-1, :, :] = w_eq
                 W[:, 0, :] = w_eq

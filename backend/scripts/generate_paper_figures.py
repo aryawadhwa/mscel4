@@ -12,6 +12,7 @@ from simulator.modules.uv import UVModule
 from simulator.modules.moisture import MoistureModule
 from simulator.property_mapper import PropertyMapper
 from simulator.integrity_checker import IntegrityChecker
+from simulator.constants import UV_BASELINE_W_M2
 
 def generate_paper_figures():
     print("Generating Q1 Paper Figures...")
@@ -21,7 +22,7 @@ def generate_paper_figures():
         
     # Compare Bagasse/PLA vs pure TPS under Tropical vs Cold Chain
     materials = ["bagasse_pla", "starch"]
-    climates = ["tropical", "cold_chain"]
+    climates = ["tropical", "cold"]
     
     dt = 1.0
     t_horizon = 365.0
@@ -34,9 +35,9 @@ def generate_paper_figures():
     
     colors = {
         "bagasse_pla_tropical": "rgba(255, 99, 71, 1.0)",
-        "bagasse_pla_cold_chain": "rgba(65, 105, 225, 1.0)",
+        "bagasse_pla_cold": "rgba(65, 105, 225, 1.0)",
         "starch_tropical": "rgba(255, 165, 0, 1.0)",
-        "starch_cold_chain": "rgba(135, 206, 250, 1.0)"
+        "starch_cold": "rgba(135, 206, 250, 1.0)"
     }
     
     for climate in climates:
@@ -46,13 +47,13 @@ def generate_paper_figures():
             mat = materials_db[mat_key]
             tm = ThermalModule(float(mat["thermal_a"]), float(mat["thermal_ea"]), float(mat["mw_0"]))
             uv = UVModule(float(mat["uv_base"]), float(mat["uv_ea"]))
-            mm = MoistureModule(float(mat["gab_xm"]), float(mat["gab_c"]), float(mat["gab_k"]), float(mat["d_eff"]), thickness=0.002, nodes=5)
+            mm = MoistureModule(float(mat["gab_xm"]), float(mat["gab_c"]), float(mat["gab_k"]), float(mat["d_eff"]), thickness=0.002)
             
             k_t = tm.compute_k(temps)
-            k_uv = uv.compute_k_uv(temps, np.ones_like(temps) * 40.0)
+            k_uv = uv.compute_k_uv(temps, np.ones_like(temps) * UV_BASELINE_W_M2)
             
             mw_t = tm.compute_mw_decay(k_t + k_uv, sm.t_array)
-            moisture = mm.solve_1d_ham_pde(dt * 86400, rhs)
+            moisture = mm.solve_1d_ham_pde(dt * 86400.0, rhs[0])
             
             knockdown = pm.compute_knockdown(mw_t, mat["mw_0"], moisture)
             
