@@ -15,6 +15,7 @@ dependencies = [
     "plotly",
     "streamlit",
     "pyyaml",
+    "SALib",
     "onnxruntime",
     "opencv-python",
     "ultralytics",

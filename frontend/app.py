@@ -13,6 +13,8 @@ from simulator.scenario_manager import ScenarioManager
 from simulator.modules.thermal import ThermalModule
 from simulator.modules.uv import UVModule
 from simulator.modules.moisture import MoistureModule
+from simulator.modules.moisture_3d import MoistureModule3D
+from simulator.modules.structural import ComponentSimulator
 from simulator.property_mapper import PropertyMapper
 from simulator.integrity_checker import IntegrityChecker
 from simulator.recommender import Recommender
@@ -51,6 +53,13 @@ base_rh = st.sidebar.slider("Base Relative Humidity", 0.0, 1.0, 0.7)
 st.sidebar.header("Failure Criteria")
 e_thresh = st.sidebar.slider("Stiffness Threshold (E/E0)", 0.1, 1.0, 0.6)
 s_thresh = st.sidebar.slider("Strength Threshold (σ/σ0)", 0.1, 1.0, 0.5)
+
+st.sidebar.header("Component Simulator (Tray)")
+tray_length = st.sidebar.number_input("Tray Length (m)", value=0.20)
+tray_width = st.sidebar.number_input("Tray Width (m)", value=0.15)
+tray_thick = st.sidebar.number_input("Tray Thickness (m)", value=0.002)
+stacking_load = st.sidebar.number_input("Stacking Load (N)", value=50.0)
+max_deflection = st.sidebar.slider("Failure Deflection (mm)", 1.0, 50.0, 15.0)
 
 # ---------------------------------------------------------------------------
 # Sidebar — Vision-Adaptive Mode
@@ -223,10 +232,19 @@ if st.button("Run Multi-Material Comparative Study"):
 
     results = []
     trajectories = {}
+    deflections_dict = {}
     time_np = np.array(sm.t_array)
 
     for key, mat in materials_db.items():
         traj = run_material_trajectory(mat, sm, temps, rhs, pm, ic, dets)
+
+        # Re-inject CLT deflection logic for 3D visualization
+        E_base = float(mat["baseline_e"])
+        lamina_Q = pm.compute_lamina_Q(E_base, E_base, 0.3, E_base / (2.0 * 1.3), traj["knockdown_std"])
+        z_coords = [-tray_thick / 2.0, tray_thick / 2.0]
+        ABD = pm.assemble_ABD(z_coords, [lamina_Q])
+        deflection = cs.compute_tray_deflection(ABD)
+        deflections_dict[mat["name"]] = np.array(deflection)
         trajectories[key] = traj
 
         delta_life = traj["life_adapt"] - traj["life_std"]
@@ -437,3 +455,97 @@ if st.button("Run Multi-Material Comparative Study"):
 
     st.subheader("Recommender Scoring")
     st.table(results)
+    st.markdown("---")
+    st.header("2. 3D Geometric Analysis")
+    
+    col_3d_1, col_3d_2 = st.columns([1, 2])
+    with col_3d_1:
+        target_mat = st.selectbox("Select Material to Visualize", list(deflections_dict.keys()))
+        time_step = st.slider("Time Step (Days)", 0, int(t_horizon), 0)
+        
+    with col_3d_2:
+        step_idx = min(int(time_step / dt), len(sm.t_array) - 1)
+        w_max = deflections_dict[target_mat][step_idx]
+        
+        # Generate Plate Bending Mesh
+        nx, ny = 50, 50
+        x = np.linspace(0, tray_length, nx)
+        y = np.linspace(0, tray_width, ny)
+        X, Y = np.meshgrid(x, y)
+        
+        # 3D Orthotropic Bending Mode Shape
+        Z = -w_max * np.sin(np.pi * X / tray_length) * np.sin(np.pi * Y / tray_width)
+        
+        fig_3d = go.Figure(data=[go.Surface(z=Z, x=X, y=Y, colorscale='Inferno')])
+        fig_3d.update_layout(
+            title=f"{target_mat} Deflection at Day {time_step} (Max Sag: {w_max:.2f} mm)",
+            scene=dict(
+                xaxis_title='Length (m)',
+                yaxis_title='Width (m)',
+                zaxis_title='Deflection (mm)',
+                zaxis=dict(range=[-max_deflection * 1.5, max_deflection * 0.1])
+            ),
+            margin=dict(l=0, r=0, b=0, t=40),
+            height=500
+        )
+        st.plotly_chart(fig_3d, use_container_width=True)
+
+    st.markdown("---")
+    st.header("3D Volumetric Moisture Analysis (Geometric Hotspot)")
+    
+    col_vol_1, col_vol_2 = st.columns([1, 2])
+    with col_vol_1:
+        st.write("Simulates moisture diffusing into a thick tray corner (1cm x 1cm) from all exposed faces.")
+        vol_mat_name = st.selectbox("Select Material for Volumetric Analysis", list(materials_db.keys()), key="vol_mat")
+        vol_nodes = st.slider("Grid Resolution (N^3)", 5, 20, 10, step=5)
+        if st.button("Compute 3D Volume (Compute Intensive)"):
+            st.session_state["compute_vol"] = True
+            st.session_state["vol_mat_name"] = vol_mat_name
+            st.session_state["vol_nodes"] = vol_nodes
+            
+    with col_vol_2:
+        if st.session_state.get("compute_vol", False):
+            v_mat = materials_db[st.session_state["vol_mat_name"]]
+            v_nodes = st.session_state["vol_nodes"]
+            
+            # Use smaller dimensions to represent a corner block (e.g. 1cm x 1cm x 2mm)
+            mm3d = MoistureModule3D(
+                float(v_mat["gab_xm"]), float(v_mat["gab_c"]), float(v_mat["gab_k"]), float(v_mat["d_eff"]), 
+                length=0.01, width=0.01, thickness=tray_thick, nodes=v_nodes
+            )
+            
+            with st.spinner("Computing 3D FTCS Diffusion in MLX..."):
+                dt_seconds = dt * 86400
+                # Using the single scenario environmental humidity
+                uptake_3d, grid_history = mm3d.solve_3d_ham_pde(dt_seconds, rhs[0])
+                
+                # Get the grid at the selected time_step
+                step_idx = min(int(time_step / dt), len(sm.t_array) - 1)
+                Z_grid = grid_history[step_idx]
+                
+                # Plotly 3D Volume
+                X, Y, Z_coords = np.mgrid[0:0.01:complex(0, v_nodes), 0:0.01:complex(0, v_nodes), 0:tray_thick:complex(0, v_nodes)]
+                
+                fig_vol = go.Figure(data=go.Volume(
+                    x=X.flatten(),
+                    y=Y.flatten(),
+                    z=Z_coords.flatten(),
+                    value=Z_grid.flatten(),
+                    isomin=np.min(Z_grid),
+                    isomax=np.max(Z_grid),
+                    opacity=0.1,
+                    surface_count=15,
+                    colorscale='YlGnBu'
+                ))
+                fig_vol.update_layout(
+                    title=f"Moisture Concentration at Day {time_step}",
+                    scene=dict(
+                        xaxis_title='X (m)',
+                        yaxis_title='Y (m)',
+                        zaxis_title='Z (Thickness)'
+                    ),
+                    margin=dict(l=0, r=0, b=0, t=40),
+                    height=500
+                )
+                st.plotly_chart(fig_vol, use_container_width=True)
+
