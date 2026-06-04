@@ -1,0 +1,29 @@
+# Vision Adapter Configuration
+# Severity weights for the Initial Integrity Factor (I₀) calculation.
+# I₀ = 1.0 - Σ(Wᵢ × Aᵢ) where Aᵢ = area ratio of damage type i.
+severity_weights:
+  crack: 0.8
+  erosion: 0.6
+  moisture: 0.5
+  discoloration: 0.2
+
+# Calibration exponent for CLT knockdown: E_adapted = E₀ × (I₀)^n
+# n ≈ 1 (linear fracture), n ≈ 2 (quadratic, conservative).
+# Default 1.5 balances between linear and quadratic assumptions.
+calibration_exponent: 1.5
+
+# Path to the exported YOLOv8-seg ONNX model (relative to project root).
+yolo_model_path: "backend/models/best.onnx"
+
+# Confidence threshold for YOLO detections.
+confidence_threshold: 0.25
+
+# Input image size for YOLO inference (square).
+input_size: 640
+
+# Class ID → damage type mapping (must match training labels).
+class_mapping:
+  0: crack
+  1: erosion
+  2: moisture
+  3: discoloration

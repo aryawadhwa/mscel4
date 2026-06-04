@@ -1,0 +1,12 @@
+numpy
+scipy
+matplotlib
+plotly
+streamlit
+pyyaml
+
+[mlx]
+mlx
+
+[torch]
+torch

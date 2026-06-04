@@ -7,19 +7,26 @@ name = "degradation-simulator"
 version = "0.1.0"
 description = "Physics-based Degradation Simulator for Sustainable Packaging"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
     "numpy",
     "scipy",
     "matplotlib",
     "plotly",
     "streamlit",
-    "pyyaml"
+    "pyyaml",
+    "onnxruntime",
+    "opencv-python",
+    "ultralytics",
+    "pillow",
+    "onnxruntime",
+    "opencv-python",
+    "ultralytics",
+    "pillow"
 ]
 
 [project.optional-dependencies]
-mlx = ["mlx"]
 torch = ["torch"]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["backend/src"]

@@ -1,4 +1,4 @@
-import mlx.core as mx
+import numpy as np
 
 class ThermalModule:
     """
@@ -10,15 +10,15 @@ class ThermalModule:
         self.Mw_0 = mw_0       # Initial molecular weight
         self.R = 8.314         # Ideal gas constant (J/(mol*K))
         
-    def compute_k(self, temps_k: mx.array) -> mx.array:
+    def compute_k(self, temps_k: np.ndarray) -> np.ndarray:
         """
         Arrhenius rate constant k(T).
         """
-        return self.A * mx.exp(-self.E_a / (self.R * temps_k))
+        return self.A * np.exp(-self.E_a / (self.R * temps_k))
 
-    def compute_mw_decay(self, k_array: mx.array, t_array: mx.array) -> mx.array:
+    def compute_mw_decay(self, k_array: np.ndarray, t_array: np.ndarray) -> np.ndarray:
         """
         First order decay of Molecular Weight.
         Mw(t) = Mw_0 * exp(-k * t)
         """
-        return self.Mw_0 * mx.exp(-k_array * t_array)
+        return self.Mw_0 * np.exp(-k_array * t_array)

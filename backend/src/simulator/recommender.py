@@ -1,4 +1,4 @@
-import mlx.core as mx
+import numpy as np
 
 class Recommender:
     """
@@ -23,7 +23,7 @@ class Recommender:
         # Scoring mechanism (1-100)
         # Margin: normalized lifetime margin above requirement
         life_margin = (days_to_failure - self.target_life) / self.target_life
-        life_score = mx.clip(mx.array(life_margin * 50.0 + 50.0), 0.0, 100.0).item()
+        life_score = np.clip(np.array(life_margin * 50.0 + 50.0), 0.0, 100.0).item()
         
         if not passed_life:
             total_score = 0.0

@@ -1,0 +1,6 @@
+Perturbation,Median_Lifetime_Days,5th_Percentile,95th_Percentile
+Baseline,364.0,364.0,364.0
+High Ea (+10%),364.0,364.0,364.0
+Low Ea (-10%),364.0,364.0,364.0
+Thick (+20%),364.0,364.0,364.0
+Thin (-20%),364.0,364.0,364.0

@@ -1,4 +1,5 @@
 # Base Parameters for Simulation Studies
+# CLT params (v12, G12, thickness) added for Vision-Adaptive coupling.
 pla:
   name: "Polylactide (PLA)"
   thermal_a: 1.0e10
@@ -13,6 +14,9 @@ pla:
   baseline_e: 3.5e9
   baseline_sigma: 60.0e6
   cost_score: 5
+  v12: 0.36            # Poisson's ratio (lit. range 0.33–0.39)
+  G12: 1.3e9           # Shear modulus (Pa)
+  thickness: 0.002     # Default lamina thickness (m)
 
 starch:
   name: "Thermoplastic Starch (TPS)"
@@ -28,6 +32,9 @@ starch:
   baseline_e: 1.2e9
   baseline_sigma: 20.0e6
   cost_score: 9
+  v12: 0.38            # Poisson's ratio (lit. range 0.35–0.42)
+  G12: 0.45e9          # Shear modulus (Pa)
+  thickness: 0.0025    # Default lamina thickness (m)
 
 bagasse_pla:
   name: "Bagasse/PLA Composite"
@@ -43,3 +50,6 @@ bagasse_pla:
   baseline_e: 5.5e9
   baseline_sigma: 85.0e6
   cost_score: 7
+  v12: 0.30            # Poisson's ratio (lit. range 0.28–0.33)
+  G12: 2.0e9           # Shear modulus (Pa)
+  thickness: 0.003     # Default lamina thickness (m)

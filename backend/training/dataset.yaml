@@ -1,0 +1,19 @@
+# YOLOv8-Seg Training Dataset Configuration
+# ============================================
+# This file is used by `yolo train` to locate the hybrid dataset.
+# Images and labels follow the standard YOLOv8 segmentation format:
+#   images/train/, images/val/  — image files (.jpg, .png)
+#   labels/train/, labels/val/  — annotation files (.txt) with polygon masks
+#
+# Label format per line: <class_id> <x1> <y1> <x2> <y2> ... <xn> <yn>
+#   (normalized polygon coordinates for segmentation masks)
+
+path: ../data/combined_dataset
+train: images/train
+val: images/val
+
+# Number of classes
+nc: 4
+
+# Class names — MUST match adapter_config.yaml class_mapping
+names: ['crack', 'erosion', 'moisture', 'discoloration']
