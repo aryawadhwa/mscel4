@@ -222,6 +222,7 @@ if st.button("Run Multi-Material Comparative Study"):
     pm = PropertyMapper()
     ic = IntegrityChecker(e_thresh, s_thresh)
     rec = Recommender(target_life)
+    cs = ComponentSimulator(tray_length, tray_width, stacking_load)
 
     dets = detections if vision_active else None
     if vision_adaptive and not vision_active:
